@@ -8,7 +8,7 @@
 
 # ---------- Étape 1 : construire le site ------------------------------------
 # "AS build" donne un nom à cette étape pour pouvoir y faire référence plus bas.
-FROM node:20-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 
 # Même astuce de cache que pour l'API : les dépendances d'abord, le code ensuite.
