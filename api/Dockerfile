@@ -6,7 +6,7 @@
 
 # Image de base : Node 20 sur Alpine Linux (une distribution minuscule, ~50 Mo).
 # On fixe la version majeure (20) pour que le build reste reproductible.
-FROM node:20-alpine
+FROM node:26-alpine
 
 # Dossier de travail dans l'image. Les commandes suivantes s'exécutent ici.
 WORKDIR /app
