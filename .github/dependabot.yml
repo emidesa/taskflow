@@ -1,0 +1,42 @@
+# ============================================================================
+# Dependabot : ouvre des PR de mise à jour des dépendances (supply chain).
+# Chaque PR passe par la CI comme n'importe quelle autre : on ne fusionne
+# une mise à jour que si les tests sont verts.
+#   - npm (api, front)        : bibliothèques JavaScript
+#   - docker (api, front)     : images de base des Dockerfiles (FROM ...)
+#   - github-actions          : actions des workflows, y compris les SHA épinglés
+#                               (Dependabot met à jour le SHA ET le commentaire # vX.Y.Z)
+# Les alertes de sécurité (Dependabot alerts / security updates) s'activent
+# en plus dans Settings > Code security.
+# ============================================================================
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories: ["/api", "/front"]
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build(deps)"
+    groups:
+      # Une seule PR pour les outils de dev (lint, tests) mineurs : moins de bruit
+      outils-de-dev:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directories: ["/api", "/front"]
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "build(docker)"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci(deps)"
+    groups:
+      actions:
+        patterns: ["*"]
