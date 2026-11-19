@@ -1,0 +1,42 @@
+# Tests unitaires des règles : on simule des séries et on vérifie les alertes.
+# Notation : "1x3" = 1 répété 4 fois ; "0x8" = 0 répété 9 fois
+rule_files:
+  - ../rules/taskflow.yml
+
+evaluation_interval: 15s
+
+tests:
+  - name: TaskFlowApiDown pending à 30 s, firing à 1 min 30
+    interval: 15s
+    input_series:
+      # ok pendant 1 min (0 s à 45 s), puis en échec à partir de 1 min
+      - series: 'probe_success{job="blackbox-health", env="prod", instance="http://front/health"}'
+        values: "1x3 0x8"
+    alert_rule_test:
+      # échec depuis 30 s : encore « pending » (for: 1m) -> rien n'est envoyé
+      - eval_time: 1m30s
+        alertname: TaskFlowApiDown
+        exp_alerts: []
+      # échec depuis 1 min 30 : « firing »
+      - eval_time: 2m30s
+        alertname: TaskFlowApiDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: blackbox-health
+              env: prod
+              instance: http://front/health
+            exp_annotations:
+              summary: "TaskFlow est injoignable (prod)"
+              description: "La sonde http://front/health échoue depuis plus d'une minute : les utilisateurs ne peuvent plus utiliser l'application."
+              runbook_url: "https://github.com/emidesa/taskflow/blob/main/docs/DEPLOIEMENT.md"
+
+  - name: Aucune alerte quand tout va bien
+    interval: 15s
+    input_series:
+      - series: 'probe_success{job="blackbox-health", env="prod", instance="http://front/health"}'
+        values: "1x20"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: TaskFlowApiDown
+        exp_alerts: []
