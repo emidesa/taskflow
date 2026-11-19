@@ -64,7 +64,7 @@ resource "docker_container" "db" {
     test     = ["CMD-SHELL", "pg_isready -U taskflow -d taskflow"]
     interval = "10s"
     timeout  = "3s"
-    retries  = 5
+    retries  = 10
   }
 }
 
