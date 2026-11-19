@@ -1,0 +1,65 @@
+name: taskflow-monitoring
+
+services:
+  prometheus:
+    image: docker.io/prom/prometheus:v3.15.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    networks: [default, taskflow]
+    restart: unless-stopped
+
+  blackbox:
+    image: docker.io/prom/blackbox-exporter:v0.29.1
+    command: --config.file=/etc/blackbox/blackbox.yml
+    volumes:
+      - ./blackbox:/etc/blackbox:ro
+    networks: [default, taskflow]
+    restart: unless-stopped
+
+  alertmanager:
+    image: docker.io/prom/alertmanager:v0.34.2
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - ./alertmanager:/etc/alertmanager:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      - "127.0.0.1:9093:9093"
+    restart: unless-stopped
+
+  mailpit:
+    image: docker.io/axllent/mailpit:v1.33.1
+    ports:
+      - "127.0.0.1:8025:8025"
+    restart: unless-stopped
+
+  grafana:
+    image: docker.io/grafana/grafana:12.0.10
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:?GF_SECURITY_ADMIN_PASSWORD manquant}
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/taskflow-red.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3001:3000"
+    restart: unless-stopped
+
+volumes:
+  prometheus-data:
+  alertmanager-data:
+  grafana-data:
+
+networks:
+  taskflow:
+    name: taskflow-prod
+    external: true

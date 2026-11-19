@@ -1,0 +1,13 @@
+# Datasource Grafana provisionnée au démarrage (« monitoring as code »).
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus # référencé par les dashboards
+    type: prometheus
+    access: proxy # c'est le serveur Grafana qui interroge Prometheus, pas le navigateur
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 15s # aligné sur scrape_interval

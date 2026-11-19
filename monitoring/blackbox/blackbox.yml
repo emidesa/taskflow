@@ -1,0 +1,13 @@
+# Modules de sonde de blackbox_exporter (utilisés par le job blackbox-health).
+modules:
+  # Succès = HTTP 2xx en moins de 5 s ET un corps qui dit "status":"ok".
+  # Un /health en 503 (base injoignable) ou un 502 du front (API tombée) = échec.
+  http_health:
+    prober: http
+    timeout: 5s
+    http:
+      method: GET
+      valid_status_codes: [200]
+      fail_if_body_not_matches_regexp:
+        - '"status":"ok"'
+      preferred_ip_protocol: ip4

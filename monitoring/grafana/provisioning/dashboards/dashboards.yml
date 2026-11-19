@@ -1,0 +1,16 @@
+# Tout fichier JSON de /var/lib/grafana/dashboards (monté depuis grafana/dashboards/)
+# est chargé au démarrage dans le dossier « TaskFlow ».
+# Modifier un dashboard dans l'interface ne suffit pas : Export > Export as JSON,
+# remplacer le fichier, et committer (sinon la modification est perdue au prochain `down -v`).
+apiVersion: 1
+
+providers:
+  - name: taskflow
+    orgId: 1
+    folder: TaskFlow
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards

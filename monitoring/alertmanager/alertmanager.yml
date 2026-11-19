@@ -1,0 +1,43 @@
+# ============================================================================
+# alertmanager.yml : QUI prévenir, COMMENT, et sans spammer.
+# Prometheus décide qu'une alerte est active ; Alertmanager la regroupe, la
+# déduplique, la route et envoie la notification.
+#
+#   docker compose -f compose.monitoring.yaml exec alertmanager amtool check-config /etc/alertmanager/alertmanager.yml
+# ============================================================================
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: "mailpit:1025"
+  smtp_from: "alertmanager@taskflow.localhost"
+  smtp_require_tls: false # Mailpit local ; un vrai SMTP exige TLS
+
+route:
+  receiver: equipe-mail
+  group_by: ["alertname", "env"] # une notification par (alerte, environnement)
+  group_wait: 10s # attendre un peu pour regrouper les alertes qui arrivent ensemble
+  group_interval: 2m
+  repeat_interval: 1h # re-notifier une alerte toujours active
+  routes:
+    # Le Watchdog n'est pas un problème : on ne le notifie pas.
+    - matchers: ['alertname = "Watchdog"']
+      receiver: nulle-part
+
+receivers:
+  - name: nulle-part
+  - name: equipe-mail
+    email_configs:
+      - to: "equipe@taskflow.localhost"
+        send_resolved: true # prévenir aussi du retour à la normale
+  # En entreprise : Slack, Teams, Discord, PagerDuty... Exemple Discord
+  # (le webhook est un secret : fichier hors Git, monté en lecture seule) :
+  # - name: equipe-discord
+  #   discord_configs:
+  #     - webhook_url_file: /etc/alertmanager/secrets/discord-webhook
+  #       send_resolved: true
+
+# Quand l'API est tombée (critical), inutile de recevoir aussi « métriques
+# illisibles », « taux d'erreur » ou « latence » (warning) pour le même environnement.
+inhibit_rules:
+  - source_matchers: ['severity = "critical"']
+    target_matchers: ['severity = "warning"']
+    equal: ["env"]
