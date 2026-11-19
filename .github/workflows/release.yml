@@ -131,29 +131,50 @@ jobs:
     permissions:
       contents: read
       packages: read
+    defaults:
+      run:
+        working-directory: infra
     env:
       TAG: ${{ needs.prepare.outputs.tag }}
-      DOCKER_DEFAULT_PLATFORM: linux/amd64
+      FRONT_PORT: "8081"
+      TF_IN_AUTOMATION: "1"
+      TF_INPUT: "0"
+      TF_VAR_ghcr_username: ${{ github.actor }}
+      TF_VAR_ghcr_token: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Copier les fichiers dans STAGING_DIR
-        run: cp compose.staging.yaml deploy/deploy.sh deploy/smoke-test.sh "$STAGING_DIR/"
+      - name: tofu init (state dans STAGING_DIR)
+        run: tofu init -lockfile=readonly -backend-config="path=$STAGING_DIR/terraform.tfstate"
 
-      - name: Connexion à ghcr.io
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Variables OpenTofu
+        run: ./ci-env.sh "$TAG"
 
-      - name: Déployer
-        run: cd "$STAGING_DIR" && COMPOSE_FILE=compose.staging.yaml ./deploy.sh "$TAG"
+      # Sans effet après le premier passage
+      - name: Migrer depuis le staging Compose (si présent)
+        run: |
+          ids="$(docker ps -aq --filter label=com.docker.compose.project=taskflow-staging)"
+          if [ -n "$ids" ]; then
+            # shellcheck disable=SC2086
+            docker rm -f $ids
+            docker network rm taskflow-staging
+          fi
+          if ! tofu state list | grep -qx 'docker_volume.pgdata' \
+             && docker volume inspect taskflow-staging-pgdata >/dev/null 2>&1; then
+            tofu import -lock-timeout=120s docker_volume.pgdata taskflow-staging-pgdata
+          fi
+
+      - name: tofu plan
+        run: tofu plan -no-color -lock-timeout=120s -out=tfplan
+
+      - name: tofu apply
+        run: |
+          tofu apply -no-color -lock-timeout=120s tfplan
+          rm -f tfplan # contient les secrets en clair
 
       - name: Smoke test
-        run: cd "$STAGING_DIR" && ./smoke-test.sh "http://host.docker.internal:8081/health" "$TAG"
-
-      - name: Déconnexion de ghcr.io
-        if: always()
-        run: docker logout ghcr.io
+        working-directory: .
+        run: ./deploy/smoke-test.sh "http://host.docker.internal:${FRONT_PORT}/health" "$TAG"
 
   deploy-production:
     needs: [prepare, images, deploy-staging]
