@@ -24,3 +24,9 @@ backups/
 *.pem
 *.key
 *.crt
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+terraform.tfvars
