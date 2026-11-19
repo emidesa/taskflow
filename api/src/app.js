@@ -3,6 +3,7 @@
 // repository en mémoire : pas de port réseau, pas de base de données.
 import express from 'express';
 import { createRequestLogger, writeLog } from './logger.js';
+import { createMetrics } from './metrics.js';
 
 const MAX_TITLE_LENGTH = 200;
 
@@ -23,8 +24,13 @@ function parseTitle(body) {
   return isValid ? title : null;
 }
 
-function createTaskRoutes(repository) {
+function createTaskRoutes(repository, metrics) {
   const router = express.Router();
+  // Retient le préfixe (/api/tasks) pour le label route des métriques
+  router.use((req, res, next) => {
+    res.locals.baseUrl = req.baseUrl;
+    next();
+  });
 
   router.get(
     '/',
@@ -42,7 +48,9 @@ function createTaskRoutes(repository) {
           error: `Le titre est obligatoire (1 à ${MAX_TITLE_LENGTH} caractères)`,
         });
       }
-      return res.status(201).json(await repository.create(title));
+      const task = await repository.create(title);
+      metrics.taskCreated();
+      return res.status(201).json(task);
     }),
   );
 
@@ -97,14 +105,20 @@ export function createApp({
   appEnv = 'local',
   appVersion = 'dev',
   log = writeLog,
+  metrics = createMetrics({ appVersion }),
 }) {
   const app = express();
 
+  // AVANT le logger et la mesure : les collectes de Prometheus (toutes les 15 s)
+  // ne polluent ni les logs ni les compteurs
+  app.get('/metrics', metrics.handler);
+
   app.use(createRequestLogger(log));
+  app.use(metrics.middleware);
   app.use(express.json());
 
   app.get('/health', createHealthHandler({ repository, appEnv, appVersion }));
-  app.use('/api/tasks', createTaskRoutes(repository));
+  app.use('/api/tasks', createTaskRoutes(repository, metrics));
 
   app.use((_req, res) => {
     res.status(404).json({ error: 'Route inconnue' });
